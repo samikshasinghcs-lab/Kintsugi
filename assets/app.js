@@ -90,6 +90,7 @@
       return;
     }
     urgency = 'No immediate movement reported';
+    nextStep = 'Do not reply to suspicious messages or share codes. If account access or transactions may be at risk, contact your bank through its official channel.';
     message.textContent = 'What happened that made you concerned?';
     renderOptions([
       ['I received a suspicious call or message', 'suspicious-contact'],
