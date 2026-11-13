@@ -130,3 +130,52 @@ main{overflow:hidden}
  .site-footer{padding:24px 17px}
 }
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.path-option,.progress-fill{transition:none}}
+
+
+/* Scroll-led Kintsugi story */
+.hero-scene{
+  position:relative;isolation:isolate;display:flex;flex-direction:column;justify-content:center;
+  align-items:flex-start;min-height:calc(100svh - 176px);max-width:none;padding:90px max(7vw,30px) 110px;
+  overflow:hidden;background:var(--paper);
+}
+.hero-backdrop{
+  position:absolute;z-index:-1;inset:-8% -4% -12% 34%;display:grid;place-items:center;
+  opacity:.68;pointer-events:none;transform:translate3d(0,var(--hero-shift,0px),0) scale(1.08);
+  transform-origin:center;will-change:transform;
+}
+.hero-backdrop svg{width:min(100%,920px);height:auto;filter:drop-shadow(0 22px 34px rgba(37,55,45,.07))}
+.hero-scene .hero-copy{width:min(760px,78vw);position:relative;z-index:1}
+.hero-scene .hero h1,.hero-scene h1{font:clamp(48px,8vw,104px)/.98 Georgia,'Times New Roman',serif;letter-spacing:-.055em;font-weight:400;max-width:850px;text-wrap:balance}
+.hero-scene h1 em{font-style:normal;color:var(--forest)}
+.hero-scene .hero-intro{font-size:clamp(16px,1.7vw,20px);max-width:520px;line-height:1.7}
+.hero-caption{position:absolute;right:7vw;bottom:64px;font:italic 15px Georgia,serif;color:#59675e}
+.scroll-cue{position:absolute;left:max(7vw,30px);bottom:30px;display:flex;align-items:center;gap:12px;font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted)}
+.scroll-cue span{display:block;width:36px;height:1px;background:var(--gold)}
+.reveal{opacity:1;transform:none}
+.js .reveal{opacity:0;transform:translateY(24px);transition:opacity .8s ease,transform .8s cubic-bezier(.2,.7,.2,1)}
+.js .reveal.is-visible{opacity:1;transform:translateY(0)}
+.js .hero-copy .reveal:nth-child(2){transition-delay:.12s}
+.js .hero-copy .reveal:nth-child(3){transition-delay:.22s}
+.js .hero-copy .reveal:nth-child(4){transition-delay:.32s}
+.reveal-section{transition:opacity .8s ease,transform .8s ease}
+.js .reveal-section{opacity:.3;transform:translateY(28px)}
+.js .reveal-section.is-visible{opacity:1;transform:translateY(0)}
+@media(max-width:800px){
+ .hero-scene{min-height:calc(100svh - 164px);padding:70px 22px 105px;justify-content:center}
+ .hero-backdrop{inset:8% -42% -3% 2%;opacity:.34;transform:translate3d(0,var(--hero-shift,0px),0) scale(1.15)}
+ .hero-scene .hero-copy{width:min(100%,650px)}
+ .hero-scene h1{font-size:clamp(48px,11vw,76px)}
+ .hero-caption{right:22px;bottom:58px;font-size:12px;max-width:230px;text-align:right}
+ .scroll-cue{left:22px;bottom:24px}
+}
+@media(max-width:520px){
+ .hero-scene{min-height:calc(100svh - 152px);padding:58px 18px 105px}
+ .hero-backdrop{inset:20% -68% -1% -15%;opacity:.28}
+ .hero-scene h1{font-size:clamp(47px,12vw,62px)}
+ .hero-scene .hero-intro{font-size:15px;max-width:340px}
+ .hero-caption{right:18px;bottom:55px;font-size:11px}
+}
+@media(prefers-reduced-motion:reduce){
+ .js .reveal,.js .reveal-section{opacity:1;transform:none;transition:none}
+ .hero-backdrop{transform:none}
+}
