@@ -30,27 +30,28 @@
   </header>
 
   <main id="main">
-    <section class="hero" aria-labelledby="hero-title">
-      <div class="hero-copy">
-        <p class="eyebrow">A calm place to find your next step</p>
-        <h1 id="hero-title">When money feels uncertain, <em>start with what happened.</em></h1>
-        <p class="hero-intro">A simple guide for suspected scams and payment hardship. No judgement. No pressure. One clear step at a time.</p>
-        <a class="text-link" href="#start">Find your next step <span aria-hidden="true">↘</span></a>
-      </div>
-      <div class="hero-art" aria-label="An abstract ceramic form joined by a gold seam" role="img">
-        <svg viewBox="0 0 520 390" aria-hidden="true" focusable="false">
-          <path class="ceramic-piece piece-a" d="M70 72 L230 35 L277 135 L207 220 L85 193 Z"/>
-          <path class="ceramic-piece piece-b" d="M277 135 L430 83 L459 236 L332 300 L207 220 Z"/>
-          <path class="ceramic-piece piece-c" d="M85 193 L207 220 L332 300 L225 357 L74 290 Z"/>
-          <path class="gold-seam" d="M230 35 L277 135 L207 220 L332 300"/>
-          <path class="gold-seam seam-secondary" d="M207 220 L85 193 M277 135 L430 83"/>
-          <circle cx="277" cy="135" r="5" class="seam-joint"/>
+    <section class="hero hero-scene" aria-labelledby="hero-title">
+      <div class="hero-backdrop" aria-hidden="true">
+        <svg viewBox="0 0 720 540" role="presentation" focusable="false">
+          <path class="ceramic-piece piece-a" d="M70 100 L318 38 L384 187 L279 305 L92 268 Z"/>
+          <path class="ceramic-piece piece-b" d="M384 187 L615 112 L659 354 L467 446 L279 305 Z"/>
+          <path class="ceramic-piece piece-c" d="M92 268 L279 305 L467 446 L303 520 L76 420 Z"/>
+          <path class="gold-seam" d="M318 38 L384 187 L279 305 L467 446"/>
+          <path class="gold-seam seam-secondary" d="M279 305 L92 268 M384 187 L615 112"/>
+          <circle cx="384" cy="187" r="7" class="seam-joint"/>
         </svg>
-        <p>Repair is not the same as pretending nothing happened.</p>
       </div>
+      <div class="hero-copy">
+        <p class="eyebrow reveal">A calm place to find your next step</p>
+        <h1 id="hero-title" class="reveal">When money feels uncertain, <em>start with what happened.</em></h1>
+        <p class="hero-intro reveal">A simple guide for suspected scams and payment hardship. No judgement. No pressure. One clear step at a time.</p>
+        <a class="text-link reveal" href="#start">Find your next step <span aria-hidden="true">↘</span></a>
+      </div>
+      <p class="hero-caption reveal">Repair is not the same as pretending nothing happened.</p>
+      <span class="scroll-cue" aria-hidden="true"><span></span> Scroll to begin</span>
     </section>
 
-    <section class="start-section" id="start" aria-labelledby="start-title">
+    <section class="start-section reveal-section" id="start" aria-labelledby="start-title">
       <div class="section-heading">
         <div>
           <p class="eyebrow">Choose the closest match</p>
@@ -103,7 +104,7 @@
       </div>
     </section>
 
-    <section class="how-section" id="how">
+    <section class="how-section reveal-section" id="how">
       <div class="section-heading">
         <div><p class="eyebrow">Designed for difficult moments</p><h2>Clarity before complexity.</h2></div>
         <p>Kintsugi helps you organise the next step. Your bank remains the authority on your account, transactions, and any financial decision.</p>
@@ -115,7 +116,7 @@
       </div>
     </section>
 
-    <section class="safety-section" id="safety" aria-labelledby="safety-title">
+    <section class="safety-section reveal-section" id="safety" aria-labelledby="safety-title">
       <div class="safety-heading">
         <p class="eyebrow">Your safety comes first</p>
         <h2 id="safety-title">A support website should never ask you to take a risk.</h2>
