@@ -34,18 +34,21 @@ CREATE TABLE IF NOT EXISTS cases (
   status text NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_review', 'resolved', 'closed')),
   summary text NOT NULL CHECK (length(summary) <= 3000),
   created_at timestamptz NOT NULL DEFAULT now(),
-  updated_at timestamptz NOT NULL DEFAULT now()
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (tenant_id, id)
 );
 CREATE INDEX IF NOT EXISTS cases_tenant_created_idx ON cases(tenant_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS case_events (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES tenants(id) ON DELETE RESTRICT,
-  case_id uuid NOT NULL REFERENCES cases(id) ON DELETE CASCADE,
+  case_id uuid NOT NULL,
   actor_subject text NOT NULL,
   event_type text NOT NULL CHECK (event_type IN ('case_created', 'status_changed', 'handoff_prepared', 'note_added')),
   detail text NOT NULL CHECK (length(detail) <= 1000),
-  created_at timestamptz NOT NULL DEFAULT now()
+  created_at timestamptz NOT NULL DEFAULT now(),
+  CONSTRAINT case_events_same_tenant_case_fk
+    FOREIGN KEY (tenant_id, case_id) REFERENCES cases(tenant_id, id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS case_events_tenant_case_idx ON case_events(tenant_id, case_id, created_at);
 
