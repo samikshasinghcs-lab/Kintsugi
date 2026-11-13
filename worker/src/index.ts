@@ -7,6 +7,13 @@ interface Env {
   ACCESS_ISSUER: string;
   ACCESS_AUD: string;
   CASE_LIMITER: RateLimit;
+  EGAIN_TOKEN_URL?: string;
+  EGAIN_API_BASE_URL?: string;
+  EGAIN_PORTAL_ID?: string;
+  EGAIN_LANGUAGE?: string;
+  EGAIN_CLIENT_ID?: string;
+  EGAIN_CLIENT_SECRET?: string;
+  EGAIN_SCOPE?: string;
 }
 type AccessIdentity = { sub: string };
 type SupportPath = 'fraud' | 'hardship';
@@ -22,6 +29,7 @@ const SECURITY_HEADERS = {
 };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: SECURITY_HEADERS });
 const error = (message: string, status: number) => json({ error: message }, status);
+const blockedSecret = (value: string) => /(?:\d[ -]?){13,19}/.test(value) || /\b(pin|password|passcode|otp|one.?time code|cvv|cvc|security code)\s*[:=]/i.test(value);
 
 async function authenticate(request: Request, env: Env): Promise<AccessIdentity | null> {
   const token = request.headers.get('Cf-Access-Jwt-Assertion');
@@ -38,13 +46,65 @@ async function authenticate(request: Request, env: Env): Promise<AccessIdentity 
 function cleanText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null;
   const cleaned = value.normalize('NFKC').trim();
-  if (!cleaned || cleaned.length > max || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(cleaned)) return null;
-  // Reject likely card numbers and credential disclosures instead of persisting them.
-  if (/(?:\d[ -]?){13,19}/.test(cleaned) || /\b(pin|password|passcode|otp|one.?time code|cvv|cvc|security code)\s*[:=]/i.test(cleaned)) return null;
+  if (!cleaned || cleaned.length > max || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(cleaned) || blockedSecret(cleaned)) return null;
   return cleaned;
 }
 function validPath(value: unknown): value is SupportPath { return value === 'fraud' || value === 'hardship'; }
 function validUrgency(value: unknown): value is Urgency { return value === 'high' || value === 'unclear' || value === 'normal'; }
+function trustedEgainUrl(raw: string | undefined, allowPath: boolean): URL | null {
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    if (u.protocol !== 'https:' || u.username || u.password || u.port || u.hash) return null;
+    if (!(u.hostname === 'egain.cloud' || u.hostname.endsWith('.egain.cloud'))) return null;
+    if (!allowPath && (u.pathname !== '/' || u.search)) return null;
+    return u;
+  } catch { return null; }
+}
+
+let tokenCache: { token: string; expiresAt: number; scopeKey: string } | null = null;
+async function getEgainToken(env: Env): Promise<string> {
+  const tokenUrl = trustedEgainUrl(env.EGAIN_TOKEN_URL, true);
+  const clientId = env.EGAIN_CLIENT_ID;
+  const clientSecret = env.EGAIN_CLIENT_SECRET;
+  const scope = env.EGAIN_SCOPE || 'app.knowledge.portalmgr.read app.core.aiservices.read';
+  if (!tokenUrl || !clientId || !clientSecret) throw new Error('EGAIN_NOT_CONFIGURED');
+  const scopeKey = `${tokenUrl.origin}${tokenUrl.pathname}:${clientId}:${scope}`;
+  if (tokenCache && tokenCache.scopeKey === scopeKey && tokenCache.expiresAt > Date.now() + 60_000) return tokenCache.token;
+
+  const form = new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret, scope });
+  const response = await fetch(tokenUrl, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded', 'accept': 'application/json' },
+    body: form,
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!response.ok) throw new Error('EGAIN_AUTH_FAILED');
+  const data = await response.json() as { access_token?: string; expires_in?: number };
+  if (typeof data.access_token !== 'string' || !data.access_token || data.access_token.length > 8192) throw new Error('EGAIN_INVALID_TOKEN_RESPONSE');
+  const ttl = Math.max(60, Math.min(Number(data.expires_in) || 300, 3600));
+  tokenCache = { token: data.access_token, expiresAt: Date.now() + ttl * 1000, scopeKey };
+  return data.access_token;
+}
+
+async function egainAnswer(env: Env, query: string): Promise<unknown> {
+  const apiBase = trustedEgainUrl(env.EGAIN_API_BASE_URL, false);
+  const portal = env.EGAIN_PORTAL_ID;
+  if (!apiBase || !portal || !/^[A-Za-z0-9_-]{1,80}$/.test(portal)) throw new Error('EGAIN_NOT_CONFIGURED');
+  const token = await getEgainToken(env);
+  const endpoint = new URL(`/core/aiservices/v4/${encodeURIComponent(portal)}/answers`, apiBase);
+  endpoint.searchParams.set('q', query);
+  endpoint.searchParams.set('$lang', env.EGAIN_LANGUAGE || 'en-US');
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json', accept: 'application/json' },
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (!response.ok) throw new Error('EGAIN_ANSWER_FAILED');
+  const text = await response.text();
+  if (text.length > 80_000) throw new Error('EGAIN_RESPONSE_TOO_LARGE');
+  try { return JSON.parse(text); } catch { throw new Error('EGAIN_INVALID_RESPONSE'); }
+}
 
 async function withTenant<T>(env: Env, identity: AccessIdentity, run: (tx: any, tenantId: string) => Promise<T>): Promise<T> {
   const sql = postgres(env.DB.connectionString, { max: 1, fetch_types: false, prepare: false, idle_timeout: 5, connect_timeout: 5 });
@@ -67,33 +127,35 @@ async function withTenant<T>(env: Env, identity: AccessIdentity, run: (tx: any, 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (request.method === 'GET' && url.pathname === '/api/health') {
-      // Health reveals no database, account, deployment, or configuration details.
-      return json({ status: 'ok' });
-    }
+    if (request.method === 'GET' && url.pathname === '/api/health') return json({ status: 'ok' });
     if (!url.pathname.startsWith('/api/')) return error('Not found', 404);
     if (request.method !== 'GET' && request.method !== 'POST') return error('Method not allowed', 405);
     if (request.headers.has('origin') && request.headers.get('origin') !== url.origin) return error('Cross-origin requests are not accepted', 403);
 
     const identity = await authenticate(request, env);
     if (!identity) return error('Authentication required', 401);
-
-    // Per-verified-identity limit. Cloudflare's limiter is approximate per location;
-    // add WAF rules and alerting before any public rollout.
     try {
-      const { success } = await env.CASE_LIMITER.limit({ key: `case-api:${identity.sub}` });
+      const { success } = await env.CASE_LIMITER.limit({ key: `kintsugi-api:${identity.sub}` });
       if (!success) return error('Too many requests. Please wait before trying again.', 429);
-    } catch {
-      // Fail closed: missing/misconfigured abuse control must not silently expose write paths.
-      return error('Service temporarily unavailable. Please try again later.', 503);
-    }
+    } catch { return error('Service temporarily unavailable. Please try again later.', 503); }
 
     try {
+      if (request.method === 'POST' && url.pathname === '/api/knowledge/answer') {
+        if (!(request.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) return error('JSON content is required', 415);
+        const size = Number(request.headers.get('content-length') || 0);
+        if (size > 3000) return error('Request is too large', 413);
+        let body: Record<string, unknown>;
+        try { body = await request.json() as Record<string, unknown>; } catch { return error('Invalid JSON body', 400); }
+        const query = cleanText(body?.query, 500);
+        if (!query) return error('Ask a short policy question. Never include account credentials or card details.', 422);
+        const answer = await egainAnswer(env, query);
+        return json({ source: 'eGain Knowledge Hub', answer });
+      }
+
       if (request.method === 'POST' && url.pathname === '/api/cases') {
-        const contentType = request.headers.get('content-type') || '';
-        if (!contentType.toLowerCase().startsWith('application/json')) return error('JSON content is required', 415);
-        const declaredLength = Number(request.headers.get('content-length') || 0);
-        if (declaredLength > 5000) return error('Request is too large', 413);
+        if (!(request.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) return error('JSON content is required', 415);
+        const size = Number(request.headers.get('content-length') || 0);
+        if (size > 5000) return error('Request is too large', 413);
         let body: Record<string, unknown>;
         try { body = await request.json() as Record<string, unknown>; } catch { return error('Invalid JSON body', 400); }
         if (!body || typeof body !== 'object' || Array.isArray(body)) return error('Invalid request body', 400);
@@ -104,7 +166,6 @@ export default {
         if (!summary) return error('A short, safe summary is required. Do not include card details, passwords, PINs, or one-time codes.', 422);
         if (body.displayName !== undefined && body.displayName !== '' && !displayName) return error('Invalid display name', 422);
         if (body.issueCategory !== undefined && body.issueCategory !== '' && !issueCategory) return error('Invalid issue category', 422);
-
         const created = await withTenant(env, identity, async (tx: any, tenantId: string) => {
           const [row] = await tx`
             insert into cases (tenant_id, created_by_subject, customer_display_name, support_path, urgency, issue_category, summary)
@@ -129,11 +190,11 @@ export default {
       }
       return error('Not found', 404);
     } catch (err) {
-      const message = err instanceof Error ? err.message : '';
-      if (message === 'NO_ACTIVE_TENANT_MEMBERSHIP') return error('No active workspace membership', 403);
-      // Never log request bodies, JWTs, emails, transaction details, or customer summaries.
-      console.error('Kintsugi API request failed', { route: url.pathname, category: 'internal_error' });
-      return error('The request could not be completed. Please try again or contact your bank directly for urgent account protection.', 500);
+      const code = err instanceof Error ? err.message : '';
+      if (code === 'NO_ACTIVE_TENANT_MEMBERSHIP') return error('No active workspace membership', 403);
+      if (code === 'EGAIN_NOT_CONFIGURED') return error('Knowledge service is not connected yet. Please contact a specialist.', 503);
+      console.error('Kintsugi API request failed', { route: url.pathname, category: code.startsWith('EGAIN_') ? 'knowledge_provider_error' : 'internal_error' });
+      return error('The request could not be completed. Please contact your bank directly for urgent account protection.', 502);
     }
   }
 };
