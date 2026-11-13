@@ -80,11 +80,15 @@
       nextStep = 'Contact your bank through an official channel immediately.';
       renderOptions([
         ['I have contacted my bank', 'bank-contacted'],
+        ['I transferred money because someone instructed me', 'transfer-under-deception'],
         ['I cannot reach my bank', 'cannot-reach-bank'],
+        ['I need a person to review this', 'human-review'],
         ['I need help understanding what happened', 'need-help']
       ], (answer) => finish({
         'bank-contacted': 'Money moved or may be pending. The customer says they contacted their bank.',
+        'transfer-under-deception': 'The customer made a transfer because someone instructed or deceived them. Treat as urgent suspected fraud and request specialist bank review. Do not imply reimbursement is guaranteed.',
         'cannot-reach-bank': 'Money movement is urgent. The customer cannot currently reach their bank.',
+        'human-review': 'The customer wants a human specialist to review a suspected fraud incident. This demo prepares a summary only; it does not send or route a case.',
         'need-help': 'The customer needs a human explanation of a suspected fraud incident.'
       }[answer]));
       return;
