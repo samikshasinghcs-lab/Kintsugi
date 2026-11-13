@@ -6,7 +6,8 @@
   "scripts": {
     "dev:worker": "wrangler dev",
     "deploy:worker": "wrangler deploy",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
     "jose": "^5.9.6",
