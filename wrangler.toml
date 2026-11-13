@@ -1,0 +1,14 @@
+name = "kintsugi-financial-recovery"
+main = "worker/src/index.ts"
+compatibility_date = "2026-11-13"
+
+# Create a Hyperdrive configuration and set its ID here before deploying.
+# Never commit database URLs or credentials.
+[[hyperdrive]]
+binding = "DB"
+id = "REPLACE_WITH_HYPERDRIVE_CONFIG_ID"
+
+[vars]
+# Replace with the exact Cloudflare Access team issuer and Access application AUD.
+ACCESS_ISSUER = "https://YOUR-TEAM.cloudflareaccess.com"
+ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD"
