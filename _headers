@@ -8,3 +8,4 @@
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Resource-Policy: same-origin
   Cache-Control: no-store
+  X-Robots-Tag: noindex, nofollow, noarchive
