@@ -49,6 +49,33 @@ function cleanText(value: unknown, max: number): string | null {
   if (!cleaned || cleaned.length > max || /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/.test(cleaned) || blockedSecret(cleaned)) return null;
   return cleaned;
 }
+async function readJsonBody(request: Request, maxBytes: number): Promise<Record<string, unknown> | null> {
+  if (!request.body) return null;
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      total += value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new Error('BODY_TOO_LARGE');
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  return parsed as Record<string, unknown>;
+}
+
 function validPath(value: unknown): value is SupportPath { return value === 'fraud' || value === 'hardship'; }
 function validUrgency(value: unknown): value is Urgency { return value === 'high' || value === 'unclear' || value === 'normal'; }
 function trustedEgainUrl(raw: string | undefined, allowPath: boolean): URL | null {
@@ -57,6 +84,7 @@ function trustedEgainUrl(raw: string | undefined, allowPath: boolean): URL | nul
     const u = new URL(raw);
     if (u.protocol !== 'https:' || u.username || u.password || u.port || u.hash) return null;
     if (!(u.hostname === 'egain.cloud' || u.hostname.endsWith('.egain.cloud'))) return null;
+    if (allowPath && (!/^\/system\/auth\/[A-Za-z0-9_-]+\/oauth2\/token$/.test(u.pathname) || u.search)) return null;
     if (!allowPath && (u.pathname !== '/' || u.search)) return null;
     return u;
   } catch { return null; }
@@ -144,9 +172,10 @@ export default {
         if (!(request.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) return error('JSON content is required', 415);
         const size = Number(request.headers.get('content-length') || 0);
         if (size > 3000) return error('Request is too large', 413);
-        let body: Record<string, unknown>;
-        try { body = await request.json() as Record<string, unknown>; } catch { return error('Invalid JSON body', 400); }
-        const query = cleanText(body?.query, 500);
+        let body: Record<string, unknown> | null;
+        try { body = await readJsonBody(request, 3000); } catch (e) { return error(e instanceof Error && e.message === 'BODY_TOO_LARGE' ? 'Request is too large' : 'Invalid JSON body', e instanceof Error && e.message === 'BODY_TOO_LARGE' ? 413 : 400); }
+        if (!body) return error('Invalid request body', 400);
+        const query = cleanText(body.query, 500);
         if (!query) return error('Ask a short policy question. Never include account credentials or card details.', 422);
         const answer = await egainAnswer(env, query);
         return json({ source: 'eGain Knowledge Hub', answer });
@@ -156,8 +185,9 @@ export default {
         if (!(request.headers.get('content-type') || '').toLowerCase().startsWith('application/json')) return error('JSON content is required', 415);
         const size = Number(request.headers.get('content-length') || 0);
         if (size > 5000) return error('Request is too large', 413);
-        let body: Record<string, unknown>;
-        try { body = await request.json() as Record<string, unknown>; } catch { return error('Invalid JSON body', 400); }
+        let body: Record<string, unknown> | null;
+        try { body = await readJsonBody(request, 5000); } catch (e) { return error(e instanceof Error && e.message === 'BODY_TOO_LARGE' ? 'Request is too large' : 'Invalid JSON body', e instanceof Error && e.message === 'BODY_TOO_LARGE' ? 413 : 400); }
+        if (!body) return error('Invalid request body', 400);
         if (!body || typeof body !== 'object' || Array.isArray(body)) return error('Invalid request body', 400);
         if (!validPath(body.supportPath) || !validUrgency(body.urgency)) return error('Invalid support path or urgency', 422);
         const summary = cleanText(body.summary, 2000);
