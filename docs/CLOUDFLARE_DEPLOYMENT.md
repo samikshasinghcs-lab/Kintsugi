@@ -47,3 +47,15 @@ Apply `worker/migrations/0001_initial.sql` with a migration/admin role. Create a
 ## Important limitations
 
 This is a starter implementation, not a completed Cloudflare account setup or production security certification. It does not configure Access, provision Hyperdrive, create the runtime database credential, seed memberships, deploy the Worker, or connect eGain. Review the schema, identity mapping, grants, logging, data-retention rules, and incident response plan with the deploying team before real customer data is used.
+
+## Worker rate limiting and eGain
+
+The Worker requires a Cloudflare Rate Limiting binding named `CASE_LIMITER`, configured in `wrangler.toml`. Choose a namespace ID unique within your Cloudflare account. The configured limit is approximate and per Cloudflare location, not a strict global quota.
+
+The Worker APIs remain behind Cloudflare Access. Add a separate WAF rate-limit rule before authentication for `/api/*`, because unauthenticated traffic does not reach the identity-based Worker limiter. Follow `docs/EDGE_ABUSE_CONTROLS.md`.
+
+For eGain, set the tenant metadata in `wrangler.toml` and store `EGAIN_CLIENT_ID` and `EGAIN_CLIENT_SECRET` with `wrangler secret put`. Use the dedicated read-only scopes. The eGain adapter is not live until credentials, portal metadata, and a successful tenant test are complete. See `egain/CONNECTOR_SETUP.md`.
+
+## Static site hosting
+
+The repository includes both Cloudflare Pages `_headers` and `vercel.json` security-header configuration. Verify the deployed response headers from the actual production domain. HSTS is scoped to the host only; expand to subdomains only after every subdomain is confirmed HTTPS-only.
