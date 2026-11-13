@@ -9,7 +9,6 @@
   const progressLabel = $('#progress-label');
   const stepLabel = $('#guide-step');
   let path = '';
-  let incident = '';
   let urgency = '';
   let nextStep = '';
 
@@ -36,13 +35,12 @@
   };
 
   function setProgress(step, total = 3) {
-    const value = Math.round((step / total) * 100);
-    progress.style.width = value + '%';
+    progress.style.width = Math.round((step / total) * 100) + '%';
     progressLabel.textContent = 'Step ' + step + ' of ' + total;
     stepLabel.textContent = path === 'fraud' ? 'Fraud safety guide' : 'Payment support guide';
   }
 
-  function renderOptions(options) {
+  function renderOptions(options, onSelect) {
     answers.replaceChildren();
     options.forEach(([label, value]) => {
       const button = document.createElement('button');
@@ -54,18 +52,13 @@
       arrow.setAttribute('aria-hidden', 'true');
       arrow.textContent = '→';
       button.append(text, arrow);
-      button.addEventListener('click', () => {
-        incident = value;
-        if (path === 'fraud') handleFraud(value);
-        else handleHardship(value);
-      });
+      button.addEventListener('click', () => onSelect(value));
       answers.append(button);
     });
   }
 
   function start(selectedPath) {
     path = selectedPath;
-    incident = '';
     urgency = '';
     nextStep = '';
     document.querySelectorAll('[data-path]').forEach((button) => {
@@ -75,7 +68,7 @@
     result.classList.add('hidden');
     setProgress(1);
     message.textContent = paths[path].first;
-    renderOptions(paths[path].options);
+    renderOptions(paths[path].options, path === 'fraud' ? handleFraud : handleHardship);
     guide.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' });
   }
 
@@ -89,7 +82,11 @@
         ['I have contacted my bank', 'bank-contacted'],
         ['I cannot reach my bank', 'cannot-reach-bank'],
         ['I need help understanding what happened', 'need-help']
-      ]);
+      ], (answer) => finish({
+        'bank-contacted': 'Money moved or may be pending. The customer says they contacted their bank.',
+        'cannot-reach-bank': 'Money movement is urgent. The customer cannot currently reach their bank.',
+        'need-help': 'The customer needs a human explanation of a suspected fraud incident.'
+      }[answer]));
       return;
     }
     urgency = 'No immediate movement reported';
@@ -99,7 +96,12 @@
       ['Someone asked me to share a code', 'code-request'],
       ['I noticed an unknown transaction', 'unknown-transaction'],
       ['I am still unsure', 'unsure-event']
-    ]);
+    ], (answer) => finish({
+      'suspicious-contact': 'The customer received a suspicious call or message.',
+      'code-request': 'Someone requested an authentication code.',
+      'unknown-transaction': 'The customer noticed a transaction they do not recognise.',
+      'unsure-event': 'The customer is unsure what happened.'
+    }[answer]));
   }
 
   function handleHardship(value) {
@@ -117,24 +119,26 @@
       ['I want to prepare what to ask', 'prepare-request'],
       ['I would rather speak to a person', 'human-support'],
       ['I am not sure where to start', 'not-sure']
-    ]);
+    ], (answer) => finish({
+      'prepare-request': 'The customer wants to prepare a hardship-support request.',
+      'human-support': 'The customer prefers to speak with a person.',
+      'not-sure': 'The customer needs help identifying the right support route.'
+    }[answer]));
   }
 
   function finish(detail) {
     setProgress(3);
     message.textContent = 'Here is a short summary you can take to your bank or a trusted adviser. Nothing has been sent or submitted.';
     answers.replaceChildren();
-    const pathName = paths[path].title;
-    const summaryText = [
+    summary.textContent = [
       'KINTSUGI — CUSTOMER-PREPARED SUMMARY',
-      'Support area: ' + pathName,
+      'Support area: ' + paths[path].title,
       'Situation: ' + detail,
       'Urgency: ' + (urgency || 'Not assessed'),
       'Suggested next step: ' + nextStep,
       '',
       'This summary was prepared in a local demo. No bank action or case submission has occurred.'
     ].join('\n');
-    summary.textContent = summaryText;
     result.classList.remove('hidden');
     result.scrollIntoView({ behavior: 'auto', block: 'nearest' });
   }
@@ -148,8 +152,12 @@
     result.classList.add('hidden');
     answers.replaceChildren();
     message.textContent = '';
+    summary.textContent = '';
+    $('#copy-status').textContent = '';
     document.querySelectorAll('[data-path]').forEach((button) => button.setAttribute('aria-pressed', 'false'));
     path = '';
+    urgency = '';
+    nextStep = '';
   });
 
   $('#finish-reset').addEventListener('click', () => {
@@ -163,32 +171,7 @@
       await navigator.clipboard.writeText(summary.textContent);
       status.textContent = 'Summary copied. Share it only through a channel you trust.';
     } catch {
-      status.textContent = 'Copy is unavailable in this browser. You can select the summary text and copy it manually.';
-    }
-  });
-
-  answers.addEventListener('click', (event) => {
-    const button = event.target.closest('button');
-    if (!button) return;
-    const selected = button.querySelector('span')?.textContent || '';
-    if (path === 'fraud') {
-      const details = {
-        'bank-contacted': 'Money moved or may be pending. The customer says they contacted their bank.',
-        'cannot-reach-bank': 'Money movement is urgent. The customer cannot currently reach their bank.',
-        'need-help': 'The customer needs a human explanation of a suspected fraud incident.',
-        'suspicious-contact': 'The customer received a suspicious call or message.',
-        'code-request': 'Someone requested an authentication code.',
-        'unknown-transaction': 'The customer noticed a transaction they do not recognise.',
-        'unsure-event': 'The customer is unsure what happened.'
-      };
-      if (Object.prototype.hasOwnProperty.call(details, incident)) finish(details[incident]);
-    } else {
-      const details = {
-        'prepare-request': 'The customer wants to prepare a hardship-support request.',
-        'human-support': 'The customer prefers to speak with a person.',
-        'not-sure': 'The customer needs help identifying the right support route.'
-      };
-      if (Object.prototype.hasOwnProperty.call(details, incident)) finish(details[incident]);
+      status.textContent = 'Copy is unavailable in this browser. Select the summary text and copy it manually.';
     }
   });
 })();
