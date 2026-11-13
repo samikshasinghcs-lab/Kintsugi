@@ -25,3 +25,9 @@ jobs:
         run: npm test
       - name: Type-check Worker
         run: npm run typecheck
+      - name: Install Playwright browser
+        run: |
+          npm install --no-save playwright
+          npx playwright install --with-deps chromium
+      - name: Run mobile browser journeys
+        run: node --test tests/browser-smoke.test.mjs
