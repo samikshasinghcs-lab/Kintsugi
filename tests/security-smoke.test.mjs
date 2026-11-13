@@ -10,7 +10,9 @@ test('public demo does not collect free text, files, or payment credentials', as
   assert.doesNotMatch(html, /type\s*=\s*["']file["']/i);
   assert.doesNotMatch(html, /<form\b/i);
   assert.match(html, /Independent demo/i);
-  assert.match(html, /We will never ask you for a PIN/i);
+  assert.match(html, /We will never ask for your PIN/i);
+  assert.match(html, /noindex, nofollow, noarchive/i);
+  assert.doesNotMatch(html, /<script[^>]+src=[\"']https?:/i);
 });
 
 test('public browser code does not transmit or persist user choices', async () => {
@@ -28,6 +30,7 @@ test('static site has restrictive response headers', async () => {
   assert.match(headers, /X-Frame-Options: DENY/);
   assert.match(headers, /Referrer-Policy: no-referrer/);
   assert.match(headers, /Permissions-Policy:/);
+  assert.match(headers, /X-Robots-Tag: noindex, nofollow, noarchive/);
 });
 
 test('worker keeps eGain credentials server-side and protects API routes', async () => {
