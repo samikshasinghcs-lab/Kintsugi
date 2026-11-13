@@ -175,4 +175,40 @@
       status.textContent = 'Copy is unavailable in this browser. Select the summary text and copy it manually.';
     }
   });
+
+
+  // Progressive scroll reveals and a gentle upward-moving hero artwork.
+  document.documentElement.classList.add('js');
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const revealTargets = document.querySelectorAll('.reveal, .reveal-section');
+  if ('IntersectionObserver' in window && !reducedMotion) {
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+    revealTargets.forEach((element) => revealObserver.observe(element));
+  } else {
+    revealTargets.forEach((element) => element.classList.add('is-visible'));
+  }
+
+  const heroBackdrop = document.querySelector('.hero-backdrop');
+  let scrollQueued = false;
+  function moveHeroArtwork() {
+    if (!heroBackdrop || reducedMotion) return;
+    const distance = Math.min(window.scrollY * -0.22, 0);
+    heroBackdrop.style.setProperty('--hero-shift', distance + 'px');
+    scrollQueued = false;
+  }
+  window.addEventListener('scroll', () => {
+    if (!scrollQueued) {
+      window.requestAnimationFrame(moveHeroArtwork);
+      scrollQueued = true;
+    }
+  }, { passive: true });
+  moveHeroArtwork();
+
 })();
