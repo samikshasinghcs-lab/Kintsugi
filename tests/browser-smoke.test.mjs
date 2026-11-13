@@ -50,6 +50,13 @@ test('Kintsugi critical browser journeys work without transmitting or storing us
   assert.match(fraudSummary, /No bank action or case submission/i);
 
   await page.getByRole('button', { name: /Start over/i }).click();
+  await page.getByRole('button', { name: /I think I’ve been scammed/i }).click();
+  await page.getByRole('button', { name: /Yes, money moved or is pending/i }).click();
+  await page.getByRole('button', { name: /I transferred money because someone instructed me/i }).click();
+  assert.match(await page.locator('#summary').innerText(), /deceived them/i);
+  assert.match(await page.locator('#summary').innerText(), /not guaranteed/i);
+
+  await page.getByRole('button', { name: /Start over/i }).click();
   await page.getByRole('button', { name: /I’m struggling with payments/i }).click();
   await page.getByRole('button', { name: /My income has stopped/i }).click();
   await page.getByRole('button', { name: /I want to prepare what to ask/i }).click();
