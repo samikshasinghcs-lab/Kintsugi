@@ -29,7 +29,11 @@ const SECURITY_HEADERS = {
 };
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: SECURITY_HEADERS });
 const error = (message: string, status: number) => json({ error: message }, status);
-const blockedSecret = (value: string) => /(?:\d[ -]?){13,19}/.test(value) || /\b(pin|password|passcode|otp|one.?time code|cvv|cvc|security code)\s*[:=]/i.test(value);
+const blockedSecret = (value: string) =>
+  /(?:\d[ -]?){13,19}/.test(value) ||
+  /\b\d{8,}\b/.test(value) ||
+  /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i.test(value) ||
+  /\b(pin|password|passcode|otp|one.?time code|cvv|cvc|security code)\s*(?:is|[:=])\s*\S+/i.test(value);
 
 async function authenticate(request: Request, env: Env): Promise<AccessIdentity | null> {
   const token = request.headers.get('Cf-Access-Jwt-Assertion');
