@@ -2,13 +2,34 @@ name = "kintsugi-financial-recovery"
 main = "worker/src/index.ts"
 compatibility_date = "2026-11-13"
 
-# Create a Hyperdrive configuration and set its ID here before deploying.
-# Never commit database URLs or credentials.
+# Hyperdrive: create a restricted PostgreSQL runtime credential and Hyperdrive config.
 [[hyperdrive]]
 binding = "DB"
 id = "REPLACE_WITH_HYPERDRIVE_CONFIG_ID"
 
+# Cloudflare Workers Rate Limiting API: approximate per-location protection.
+# Use a namespace ID unique within your Cloudflare account.
+[[ratelimits]]
+name = "CASE_LIMITER"
+namespace_id = "2026111301"
+
+  [ratelimits.simple]
+  limit = 12
+  period = 60
+
 [vars]
-# Replace with the exact Cloudflare Access team issuer and Access application AUD.
 ACCESS_ISSUER = "https://YOUR-TEAM.cloudflareaccess.com"
 ACCESS_AUD = "REPLACE_WITH_ACCESS_APPLICATION_AUD"
+
+# Obtain these non-secret values from your eGain Client Application Metadata.
+EGAIN_TOKEN_URL = "https://ai.egain.cloud/REPLACE_WITH_TENANT_AUTH_PATH"
+EGAIN_API_BASE_URL = "https://api.ai.egain.cloud"
+EGAIN_PORTAL_ID = "REPLACE_WITH_CUSTOMER_SAFE_PORTAL_ID"
+EGAIN_LANGUAGE = "en-US"
+EGAIN_SCOPE = "app.knowledge.portalmgr.read app.core.aiservices.read"
+
+# Store the eGain client secret only with:
+#   npx wrangler secret put EGAIN_CLIENT_SECRET
+# Never put it in this file, GitHub, browser code, or screenshots.
+# Store EGAIN_CLIENT_ID as a secret too if your deployment policy requires it:
+#   npx wrangler secret put EGAIN_CLIENT_ID
